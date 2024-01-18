@@ -6,19 +6,45 @@
 
 #define CMDLINE_MAX 512
 
-int custom_system(char* cmd){
+char **whitespace_delimiter(char *cmd)
+{
+    char *argument = strtok(cmd, " ");
+    char **args = malloc(1 * sizeof(char *));
+    int count = 0;
+    while (argument != NULL)
+    {
+        args = realloc(args, 1 * sizeof(char *));
+        args[count] = argument;
+        count++;
+        argument = strtok(NULL, " ");
+    }
+    return args;
+}
+
+int custom_system(char *cmd)
+{
     pid_t pid;
     pid = fork();
-    char *args[] = {cmd, NULL};
-    if (pid == 0) {
-        execvp(cmd, args);
+    char *args[];
+
+    char **test = whitespace_delimiter(cmd);
+
+    test = realloc()
+
+        if (pid == 0)
+    {
+        execvp(test[0], args);
         perror("execv");
         exit(1);
-    } else if (pid > 0) {
+    }
+    else if (pid > 0)
+    {
         int status;
         waitpid(pid, &status, 0);
         printf("Child returned %d\n", WEXITSTATUS(status));
-    } else {
+    }
+    else
+    {
         perror("fork");
         exit(1);
     }

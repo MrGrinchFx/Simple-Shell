@@ -6,25 +6,19 @@
 
 #define CMDLINE_MAX 512
 
-int custom_system(char *cmd)
-{
+int custom_system(char* cmd){
     pid_t pid;
     pid = fork();
-    char args[] = {cmd, NULL};
-    if (pid == 0)
-    {
-        execv(cmd, args);
+    char *args[] = {cmd, NULL};
+    if (pid == 0) {
+        execvp(cmd, args);
         perror("execv");
         exit(1);
-    }
-    else if (pid > 0)
-    {
+    } else if (pid > 0) {
         int status;
         waitpid(pid, &status, 0);
         printf("Child returned %d\n", WEXITSTATUS(status));
-    }
-    else
-    {
+    } else {
         perror("fork");
         exit(1);
     }
@@ -37,10 +31,10 @@ int main(void)
 
     while (1)
     {
-        charnl;
+        char *nl;
         int retval;
 
-        /* Print prompt poopy*/
+        /* Print prompt poopy */
         printf("sshell@ucd$ ");
         fflush(stdout);
 
@@ -54,21 +48,21 @@ int main(void)
             fflush(stdout);
         }
 
-        / Remove trailing newline from command line * /
-            nl = strchr(cmd, '\n');
+        /* Remove trailing newline from command line */
+        nl = strchr(cmd, '\n');
         if (nl)
-            nl = '\0';
+            *nl = '\0';
 
-        /*Builtin command */
+        /* Builtin command */
         if (!strcmp(cmd, "exit"))
         {
             fprintf(stderr, "Bye...\n");
             break;
         }
 
-        /*Regular command change this so its doesn't use system*/
+        /* Regular command change this so its doesn't use system*/
         retval = custom_system(cmd);
-        fprintf(stdout, "Return status value for '%s': %d\n",
+        fprintf(stdout, "+ completed '%s' [%d]\n",
                 cmd, retval);
     }
 

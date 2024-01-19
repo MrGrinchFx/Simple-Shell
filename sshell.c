@@ -9,31 +9,29 @@
 char **whitespace_delimiter(char *cmd)
 {
     char *argument = strtok(cmd, " ");
-    char **args = malloc(1 * sizeof(char *));
-    int count = 0;
+    char **args = malloc(32);
+    int count = 2;
     while (argument != NULL)
     {
-        args = realloc(args, 1 * sizeof(char *));
-        args[count] = argument;
-        count++;
+        args = realloc(args, count * 32);
+        args[count-2] = argument;
         argument = strtok(NULL, " ");
+        count++;
     }
+    args = realloc(args, count * 32);
+    args[count+1] = NULL;
     return args;
 }
 
 int custom_system(char *cmd)
 {
+    char** args = whitespace_delimiter(cmd);
     pid_t pid;
     pid = fork();
-    char *args[];
 
-    char **test = whitespace_delimiter(cmd);
-
-    test = realloc()
-
-        if (pid == 0)
+    if (pid == 0)
     {
-        execvp(test[0], args);
+        execvp(args[0], args);
         perror("execv");
         exit(1);
     }
@@ -41,13 +39,14 @@ int custom_system(char *cmd)
     {
         int status;
         waitpid(pid, &status, 0);
-        printf("Child returned %d\n", WEXITSTATUS(status));
+        //printf("Child returned %d\n", WEXITSTATUS(status));
     }
     else
     {
         perror("fork");
         exit(1);
     }
+    free(args);
     return 0;
 }
 

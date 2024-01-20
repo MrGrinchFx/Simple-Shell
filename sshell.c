@@ -23,9 +23,8 @@ char **whitespace_delimiter(char *cmd)
     return args;
 }
 
-int custom_system(char *cmd)
+int custom_system(char *cmd, char **args)
 {
-    char **args = whitespace_delimiter(cmd);
     pid_t pid;
     pid = fork();
 
@@ -113,7 +112,7 @@ int main(void)
         }
 
         /* Regular command*/
-        retval = custom_system(cmd);
+        retval = custom_system(cmd, args);
         fprintf(stdout, "+ completed '%s' [%d]\n",
                 cmd, retval);
     }

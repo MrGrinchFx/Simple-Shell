@@ -25,29 +25,29 @@ char **whitespace_delimiter(char *cmd)
     args[count + 1] = NULL;
     return args;
 }
-int find_first_nonflag(char **args)
-{ // if there are flags find the first non-flag index
-    int non_flag_index = -1;
-    int size = (sizeof(args) / sizeof(args[0]));
-    for (int i = 1; i < size; i++)
+
+void redirect(char **args)
+{
+    int count = 0; // Retrieve num of args
+    while (args[count] != NULL)
     {
-        if (args[i][0] != '-')
+        count++;
+    }
+
+    for (int i = 0; i < count; i++)
+    { // Find the first redirect symbol (Assuming there is only one redirect)
+        if (strcmp(args[i], ">") == 0)
         {
-            non_flag_index = i;
+            int fileDesc = open(args[i + 1], O_WRONLY | O_CREAT, 0777); // create file descriptor
+            /*Add Error Checking here*/
+            dup2(fileDesc, STDOUT_FILENO); // duplicate to stdout
+            close(fileDesc);               // remove original descriptor
+            args[i] = NULL;                // set ">" as NULL
+            args[i + 1] = NULL;            // set "filename.txt" to null
             break;
         }
     }
-    if (non_flag_index != -1)
-    {
-        return non_flag_index;
-    }
-    else
-    { // if no flags then continue as normal
-        return 1;
-        printf("nonflag func");
-    }
 }
-
 int custom_system(char *cmd, char **args)
 {
     pid_t pid;
@@ -56,31 +56,8 @@ int custom_system(char *cmd, char **args)
     if (pid == 0)
     {
         /*Child Process*/
-        int count = 0; // Retrieve num of args
-        while (args[count] != NULL)
-        {
-            count++;
-        }
+        redirect(args);
 
-        for (int i = 0; i < count; i++)
-        { // Find the first redirect symbol (Assuming there is only one redirect)
-            if (strcmp(args[i], ">") == 0)
-            {
-                int fileDesc = open(args[i + 1], O_WRONLY | O_CREAT, 0777); // create file descriptor
-                /*Add Error Checking here*/
-                dup2(fileDesc, STDOUT_FILENO); // duplicate to stdout
-                close(fileDesc);               // remove original descriptor
-                args[i] = NULL;                // set ">" as NULL
-                args[i + 1] = NULL;            // set "filename.txt" to null
-                break;
-            }
-        }
-        /*TESTING CODE*/
-        // int fd = open("test.txt", O_WRONLY | O_CREAT, 0777);
-        // dup2(fd, STDOUT_FILENO);
-        // close(fd);
-
-        // char *test[] = {"date", "-u"};
         execvp(args[0], args);
         perror("execv");
         exit(1);

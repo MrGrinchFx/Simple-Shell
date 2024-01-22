@@ -36,9 +36,19 @@ void redirect(char **args)
 
     for (int i = 0; i < count; i++)
     { // Find the first redirect symbol (Assuming there is only one redirect)
-        if (strcmp(args[i], ">") == 0)
+        if (strcmp(args[i], ">") == 0 && i != count-1)
         {
-            int fileDesc = open(args[i + 1], O_WRONLY | O_CREAT, 0777); // create file descriptor
+            int fileDesc = open(args[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777); // create file descriptor
+            /*Add Error Checking here*/
+            dup2(fileDesc, STDOUT_FILENO); // duplicate to stdout
+            close(fileDesc);               // remove original descriptor
+            args[i] = NULL;                // set ">" as NULL
+            args[i + 1] = NULL;            // set "filename.txt" to null
+            break;
+        }
+        else if (strcmp(args[i], ">>") == 0 && i != count-1)
+        {
+            int fileDesc = open(args[i + 1], O_WRONLY | O_APPEND, 0777); // create file descriptor
             /*Add Error Checking here*/
             dup2(fileDesc, STDOUT_FILENO); // duplicate to stdout
             close(fileDesc);               // remove original descriptor
@@ -47,36 +57,6 @@ void redirect(char **args)
             break;
         }
     }
-}
-int custom_system(char *cmd, char **args)
-{
-    pid_t pid;
-    pid = fork();
-
-    if (pid == 0)
-    {
-        /*Child Process*/
-        redirect(args);
-
-        execvp(args[0], args);
-        perror("execv");
-        exit(1);
-    }
-    else if (pid > 0)
-    {
-        /*Parent Process*/
-        int status;
-        waitpid(pid, &status, 0);
-        // printf("Child returned %d\n", WEXITSTATUS(status));
-    }
-    else
-    {
-        // Error Returned
-        perror("fork");
-        exit(1);
-    }
-    free(args);
-    return 0;
 }
 
 void cd_command(char **args)
@@ -97,6 +77,48 @@ void pwd_command()
         perror("pwd");
     }
     printf("%s\n", cwd);
+}
+
+int custom_system(char **args)
+{
+    /*CD COMMAND*/
+    if (!strcmp(args[0], "cd"))
+    {
+        cd_command(args);
+        return 0;
+    }
+    /*PWD COMMAND*/
+    if (!strcmp(args[0], "pwd"))
+    {
+        pwd_command();
+        return 0;
+    }
+
+    pid_t pid;
+    pid = fork();
+    
+    if (pid == 0)
+    {
+        /*Child Process*/
+        execvp(args[0], args);
+        perror("execv");
+        exit(1);
+    }
+    else if (pid > 0)
+    {
+        /*Parent Process*/
+        int status;
+        waitpid(pid, &status, 0);
+        // printf("Child returned %d\n", WEXITSTATUS(status));
+    }
+    else
+    {
+        // Error Returned
+        perror("fork");
+        exit(1);
+    }
+    free(args);
+    return 0;
 }
 
 int main(void)
@@ -133,26 +155,19 @@ int main(void)
             fprintf(stderr, "Bye...\n");
             break;
         }
+
         char **args = whitespace_delimiter(cmd);
-        /*CD COMMAND*/
 
-        if (!strcmp(args[0], "cd"))
-        {
-            cd_command(args);
-            continue;
-        }
-        /*PWD COMMAND*/
+        /* Save output redirection */
+        int saved_out = dup(1);
+        redirect(args);
 
-        if (!strcmp(args[0], "pwd"))
-        {
-            pwd_command();
-            continue;
-        }
-
-        /* Regular command*/
-        retval = custom_system(cmd, args);
-        fprintf(stdout, "+ completed '%s' [%d]\n",
-                cmd, retval);
+        /* Execute command*/
+        retval = custom_system(args);
+        /* Restore output redirection */
+        dup2(saved_out, 1);
+        close(saved_out);
+        fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
     }
 
     return EXIT_SUCCESS;

@@ -48,7 +48,7 @@ void redirect(char **args)
         }
         else if (strcmp(args[i], ">>") == 0 && i != count-1)
         {
-            int fileDesc = open(args[i + 1], O_WRONLY | O_APPEND, 0777); // create file descriptor
+            int fileDesc = open(args[i + 1], O_WRONLY | O_APPEND | O_CREAT, 0777); // create file descriptor
             /*Add Error Checking here*/
             dup2(fileDesc, STDOUT_FILENO); // duplicate to stdout
             close(fileDesc);               // remove original descriptor

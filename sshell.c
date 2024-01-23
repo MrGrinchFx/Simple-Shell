@@ -5,6 +5,8 @@
 #include <sys/wait.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define CMDLINE_MAX 512
 #define CWD_MAX 1024
@@ -29,48 +31,59 @@
 //     return args;
 // }
 
-struct Command_Node {
-    char** args;
-    struct Command_Node* next;
+struct Command_Node
+{
+    char **args;
+    struct Command_Node *next;
     pid_t pid;
 } Command_Node;
 
-void appendNode(struct Command_Node** head, char** args) {
-    struct Command_Node* newNode = (struct Command_Node*)malloc(sizeof(Command_Node));
-    if (newNode == NULL) {
+void appendNode(struct Command_Node **head, char **args)
+{
+    struct Command_Node *newNode = (struct Command_Node *)malloc(sizeof(Command_Node));
+    if (newNode == NULL)
+    {
         return;
     }
     newNode->args = args;
     newNode->next = NULL;
-    if (*head == NULL) {
+    if (*head == NULL)
+    {
         *head = newNode;
         return;
     }
-    struct Command_Node* current = *head;
-    while (current->next != NULL) {
+    struct Command_Node *current = *head;
+    while (current->next != NULL)
+    {
         current = current->next;
     }
     current->next = newNode;
 }
 
-struct Command_Node* createLinkedList(char **args) {
-    struct Command_Node* head = NULL;
+struct Command_Node *createLinkedList(char **args)
+{
+    struct Command_Node *head = NULL;
     int commandSize = 0;
     int i = 0;
-    while (args[i-1] != NULL) {
-        if (!args[i] || strcmp(args[i], "|") == 0) {
+    while (args[i - 1] != NULL)
+    {
+        if (!args[i] || strcmp(args[i], "|") == 0)
+        {
             // Create a new subarray with an additional NULL element
-            char** newArgs = (char**)malloc((commandSize + 1) * sizeof(char*));
+            char **newArgs = (char **)malloc((commandSize + 1) * sizeof(char *));
             // Copy elements from the original subarray
-            for (int j = 0; j < commandSize; ++j) {
-                newArgs[j] = args[i-commandSize+j];
+            for (int j = 0; j < commandSize; ++j)
+            {
+                newArgs[j] = args[i - commandSize + j];
             }
             newArgs[commandSize] = NULL;
 
             // Append the node with the new subarray
             appendNode(&head, newArgs);
             commandSize = 0;
-        } else {
+        }
+        else
+        {
             commandSize += 1;
         }
         i += 1;
@@ -79,10 +92,12 @@ struct Command_Node* createLinkedList(char **args) {
     return head;
 }
 
-int getNumCommands(struct Command_Node* head) {
+int getNumCommands(struct Command_Node *head)
+{
     int num = 0;
-    struct Command_Node* curr = head;
-    while(curr) {
+    struct Command_Node *curr = head;
+    while (curr)
+    {
         num++;
         curr = curr->next;
     }
@@ -225,27 +240,60 @@ int pwd_command()
     printf("%s\n", cwd);
     return 0;
 }
+void sls_command()
+{
+    DIR *directory;
+    char *fileName;
+    struct dirent *directoryContent;
+    directory = opendir("."); // open current directory
+    struct stat st;
 
-void closeFDS(int fds[][2], int numCommands) {
-    for(int i = 0; i < numCommands-1; i++) {
+    while ((directoryContent = readdir(directory)) != NULL)
+    {
+        if (!strcmp(directoryContent->d_name, ".") || !strcmp(directoryContent->d_name, ".."))
+        {
+        }
+        else
+        {
+            printf("%s ", directoryContent->d_name);
+            if (stat(directoryContent->d_name, &st) == 0)
+            {
+                printf("(%ld bytes)\n", st.st_size); // in bytes
+            }
+            else
+            {
+                perror("Error: cannot open directory")
+            }
+        }
+    }
+    closedir(directory);
+}
+
+void closeFDS(int fds[][2], int numCommands)
+{
+    for (int i = 0; i < numCommands - 1; i++)
+    {
         close(fds[i][0]);
         close(fds[i][1]);
     }
 }
 
-void custom_system(struct Command_Node* head, int numCommands, int returnValues[])
+void custom_system(struct Command_Node *head, int numCommands, int returnValues[])
 {
     // create array of pipes;
-    int fds[numCommands-1][2];
-    for(int i = 0; i < numCommands-1; i++) {
+    int fds[numCommands - 1][2];
+    for (int i = 0; i < numCommands - 1; i++)
+    {
         pipe(fds[i]);
     }
 
-    struct Command_Node* curr = head;
+    struct Command_Node *curr = head;
     int currProcess = 0;
-    while(curr) {
+    while (curr)
+    {
         /*CD COMMAND*/
-        if (!strcmp(curr->args[0], "cd")) {
+        if (!strcmp(curr->args[0], "cd"))
+        {
             returnValues[currProcess] = cd_command(curr->args);
             free(curr->args);
             curr = curr->next;
@@ -254,7 +302,8 @@ void custom_system(struct Command_Node* head, int numCommands, int returnValues[
             continue;
         }
         /*PWD COMMAND*/
-        if (!strcmp(curr->args[0], "pwd")) {
+        if (!strcmp(curr->args[0], "pwd"))
+        {
             returnValues[currProcess] = pwd_command();
             free(curr->args);
             curr = curr->next;
@@ -263,24 +312,32 @@ void custom_system(struct Command_Node* head, int numCommands, int returnValues[
             continue;
         }
 
-        if(currProcess == 0) {                    // first command
-            if (!(curr->pid = fork())) {
+        if (currProcess == 0)
+        { // first command
+            if (!(curr->pid = fork()))
+            {
                 dup2(fds[currProcess][1], STDOUT_FILENO); /* Replace stdout with pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args);
                 exit(1);
             }
-        } else if(currProcess == numCommands-1) { // last command
-            if (!(curr->pid = fork())) {
-                dup2(fds[currProcess-1][0], STDIN_FILENO); /* Replace stdin with pipe */
+        }
+        else if (currProcess == numCommands - 1)
+        { // last command
+            if (!(curr->pid = fork()))
+            {
+                dup2(fds[currProcess - 1][0], STDIN_FILENO); /* Replace stdin with pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args); /* Child #2 becomes command2 */
                 exit(1);
             }
-        } else {
-            if (!(curr->pid = fork())) {    // in between commands
-                dup2(fds[currProcess-1][0], STDIN_FILENO); /* Replace stdin with previous pipe */
-                dup2(fds[currProcess][1], STDOUT_FILENO); /* Replace stdout with next pipe */
+        }
+        else
+        {
+            if (!(curr->pid = fork()))
+            {                                                // in between commands
+                dup2(fds[currProcess - 1][0], STDIN_FILENO); /* Replace stdin with previous pipe */
+                dup2(fds[currProcess][1], STDOUT_FILENO);    /* Replace stdout with next pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args); /* Child #2 becomes command2 */
                 exit(1);
@@ -294,7 +351,8 @@ void custom_system(struct Command_Node* head, int numCommands, int returnValues[
     /*close all fds*/
     closeFDS(fds, numCommands);
     /*wait for all children to finish*/
-    while(head) {
+    while (head)
+    {
         waitpid(head->pid, NULL, 0);
         head = head->next;
     }
@@ -337,7 +395,7 @@ int main(void)
         char **args = custom_parser(cmd);
         int saved_out = dup(1);
         redirect(args);
-        struct Command_Node* head = createLinkedList(args);
+        struct Command_Node *head = createLinkedList(args);
         int numCommands = getNumCommands(head);
         int retvals[numCommands];
         /*debug for printing contents of linked list*/
@@ -361,7 +419,8 @@ int main(void)
         dup2(saved_out, 1);
         close(saved_out);
         fprintf(stdout, "+ completed '%s' ", cmd);
-        for(int i = 0; i < numCommands; i++) {
+        for (int i = 0; i < numCommands; i++)
+        {
             fprintf(stdout, "[%d]", retvals[i]);
         }
         fprintf(stdout, "\n");

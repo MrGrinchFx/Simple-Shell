@@ -225,7 +225,6 @@ int pwd_command()
 int sls_command()
 {
     DIR *directory;
-    char *fileName;
     struct dirent *directoryContent;
     directory = opendir("."); // open current directory
     struct stat st;
@@ -377,6 +376,7 @@ int main(void)
         if (!strcmp(cmd, "exit"))
         {
             fprintf(stderr, "Bye...\n");
+            fprintf(stderr, "+ completed '%s' [0]\n", cmd);
             break;
         }
 
@@ -406,12 +406,12 @@ int main(void)
         }
         dup2(saved_out, 1);
         close(saved_out);
-        fprintf(stdout, "+ completed '%s' ", cmd);
+        fprintf(stderr, "+ completed '%s' ", cmd);
         for (int i = 0; i < numCommands; i++)
         {
-            fprintf(stdout, "[%d]", retvals[i]);
+            fprintf(stderr, "[%d]", retvals[i]);
         }
-        fprintf(stdout, "\n");
+        fprintf(stderr, "\n");
     }
 
     return EXIT_SUCCESS;

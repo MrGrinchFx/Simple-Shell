@@ -29,6 +29,66 @@
 //     return args;
 // }
 
+struct Command_Node {
+    char** args;
+    struct Command_Node* next;
+    pid_t pid;
+} Command_Node;
+
+void appendNode(struct Command_Node** head, char** args) {
+    struct Command_Node* newNode = (struct Command_Node*)malloc(sizeof(Command_Node));
+    if (newNode == NULL) {
+        return;
+    }
+    newNode->args = args;
+    newNode->next = NULL;
+    if (*head == NULL) {
+        *head = newNode;
+        return;
+    }
+    struct Command_Node* current = *head;
+    while (current->next != NULL) {
+        current = current->next;
+    }
+    current->next = newNode;
+}
+
+struct Command_Node* createLinkedList(char **args) {
+    struct Command_Node* head = NULL;
+    int commandSize = 0;
+    int i = 0;
+    while (args[i-1] != NULL) {
+        if (!args[i] || strcmp(args[i], "|") == 0) {
+            // Create a new subarray with an additional NULL element
+            char** newArgs = (char**)malloc((commandSize + 1) * sizeof(char*));
+            // Copy elements from the original subarray
+            for (int j = 0; j < commandSize; ++j) {
+                newArgs[j] = args[i-commandSize+j];
+            }
+            newArgs[commandSize] = NULL;
+
+            // Append the node with the new subarray
+            appendNode(&head, newArgs);
+            commandSize = 0;
+        } else {
+            commandSize += 1;
+        }
+        i += 1;
+    }
+
+    return head;
+}
+
+int getNumCommands(struct Command_Node* head) {
+    int num = 0;
+    struct Command_Node* curr = head;
+    while(curr) {
+        num++;
+        curr = curr->next;
+    }
+    return num;
+}
+
 /*TO DOOOOO: PLS MAKE SURE THAT WE CHECK IF BUFFER IS EMPTY WHEN WE ENCOUNTER THE KEY CHAR TO DETERMINE IF WE EXECUTE*/
 char **custom_parser(char *cmd)
 {
@@ -103,6 +163,7 @@ char **custom_parser(char *cmd)
     }
     /*WRITE CODE THAT WILL HANDLE ADDING THE LAST ARG AND NULL*/
     args[argCount] = malloc(MAX_ARG_SIZE);
+    buffer[count] = '\0';
     strcpy(args[argCount], buffer);
     argCount++;
     args = realloc(args, (argCount + 1) * sizeof(char *));
@@ -143,16 +204,17 @@ void redirect(char **args)
     }
 }
 
-void cd_command(char **args)
+int cd_command(char **args)
 {
     int status = chdir(args[1]);
     if (status != 0)
     {
         perror("cd");
     }
+    return 0;
 }
 
-void pwd_command()
+int pwd_command()
 {
     char cwd[CWD_MAX];
     char *status = getcwd(cwd, sizeof(cwd));
@@ -161,47 +223,81 @@ void pwd_command()
         perror("pwd");
     }
     printf("%s\n", cwd);
+    return 0;
 }
 
-int custom_system(char **args)
+void closeFDS(int fds[][2], int numCommands) {
+    for(int i = 0; i < numCommands-1; i++) {
+        close(fds[i][0]);
+        close(fds[i][1]);
+    }
+}
+
+void custom_system(struct Command_Node* head, int numCommands, int returnValues[])
 {
-    /*CD COMMAND*/
-    if (!strcmp(args[0], "cd"))
-    {
-        cd_command(args);
-        return 0;
-    }
-    /*PWD COMMAND*/
-    if (!strcmp(args[0], "pwd"))
-    {
-        pwd_command();
-        return 0;
+    // create array of pipes;
+    int fds[numCommands-1][2];
+    for(int i = 0; i < numCommands-1; i++) {
+        pipe(fds[i]);
     }
 
-    pid_t pid;
-    pid = fork();
+    struct Command_Node* curr = head;
+    int currProcess = 0;
+    while(curr) {
+        /*CD COMMAND*/
+        if (!strcmp(curr->args[0], "cd")) {
+            returnValues[currProcess] = cd_command(curr->args);
+            free(curr->args);
+            curr = curr->next;
+            returnValues[currProcess] = 0;
+            currProcess++;
+            continue;
+        }
+        /*PWD COMMAND*/
+        if (!strcmp(curr->args[0], "pwd")) {
+            returnValues[currProcess] = pwd_command();
+            free(curr->args);
+            curr = curr->next;
+            returnValues[currProcess] = 0;
+            currProcess++;
+            continue;
+        }
 
-    if (pid == 0)
-    {
-        /*Child Process*/
-        execvp(args[0], args);
-        return 1;
+        if(currProcess == 0) {                    // first command
+            if (!(curr->pid = fork())) {
+                dup2(fds[currProcess][1], STDOUT_FILENO); /* Replace stdout with pipe */
+                closeFDS(fds, numCommands);
+                execvp(curr->args[0], curr->args);
+                exit(1);
+            }
+        } else if(currProcess == numCommands-1) { // last command
+            if (!(curr->pid = fork())) {
+                dup2(fds[currProcess-1][0], STDIN_FILENO); /* Replace stdin with pipe */
+                closeFDS(fds, numCommands);
+                execvp(curr->args[0], curr->args); /* Child #2 becomes command2 */
+                exit(1);
+            }
+        } else {
+            if (!(curr->pid = fork())) {    // in between commands
+                dup2(fds[currProcess-1][0], STDIN_FILENO); /* Replace stdin with previous pipe */
+                dup2(fds[currProcess][1], STDOUT_FILENO); /* Replace stdout with next pipe */
+                closeFDS(fds, numCommands);
+                execvp(curr->args[0], curr->args); /* Child #2 becomes command2 */
+                exit(1);
+            }
+        }
+        free(curr->args);
+        curr = curr->next;
+        returnValues[currProcess] = 0;
+        currProcess++;
     }
-    else if (pid > 0)
-    {
-        /*Parent Process*/
-        int status;
-        waitpid(pid, &status, 0);
-        // printf("Child returned %d\n", WEXITSTATUS(status));
+    /*close all fds*/
+    closeFDS(fds, numCommands);
+    /*wait for all children to finish*/
+    while(head) {
+        waitpid(head->pid, NULL, 0);
+        head = head->next;
     }
-    else
-    {
-        // Error Returned
-        perror("fork");
-        exit(1);
-    }
-    free(args);
-    return 0;
 }
 
 int main(void)
@@ -211,7 +307,6 @@ int main(void)
     while (1)
     {
         char *nl;
-        int retval;
 
         /* Print prompt */
         printf("sshell@ucd$ ");
@@ -240,22 +335,36 @@ int main(void)
         }
 
         char **args = custom_parser(cmd);
-
-        /* Save output redirection */
         int saved_out = dup(1);
         redirect(args);
+        struct Command_Node* head = createLinkedList(args);
+        int numCommands = getNumCommands(head);
+        int retvals[numCommands];
+        /*debug for printing contents of linked list*/
+        // while(head) {
+        //     for(int i = 0; head->args[i] != NULL; i++) {
+        //         printf("%s ", head->args[i]);
+        //     }
+        //     printf("\n");
+        //     head = head->next;
+        // }
+        /* Save output redirection */
 
         /* Execute command*/
-        retval = custom_system(args);
+        custom_system(head, numCommands, retvals);
         /* Restore output redirection */
 
-        if (retval == 1)
+        if (retvals[0] == 1)
         { // Command not Found
             printf("Error: command not found\n");
         }
         dup2(saved_out, 1);
         close(saved_out);
-        fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
+        fprintf(stdout, "+ completed '%s' ", cmd);
+        for(int i = 0; i < numCommands; i++) {
+            fprintf(stdout, "[%d]", retvals[i]);
+        }
+        fprintf(stdout, "\n");
     }
 
     return EXIT_SUCCESS;

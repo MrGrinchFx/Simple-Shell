@@ -13,24 +13,6 @@
 #define MAX_ARG_SIZE 32
 #define MAX_NUM_ARGS 16
 
-// char **whitespace_delimiter(char *cmd)
-// {
-
-//     char *argument = strtok(cmd, " ");
-//     char **args = malloc(MAX_BYTES);
-//     int count = 2;
-//     while (argument != NULL)
-//     {
-//         args = realloc(args, count * MAX_BYTES);
-//         args[count - 2] = argument;
-//         argument = strtok(NULL, " ");
-//         count++;
-//     }
-//     args = realloc(args, count * MAX_BYTES);
-//     args[count + 1] = NULL;
-//     return args;
-// }
-
 struct Command_Node
 {
     char **args;
@@ -240,7 +222,7 @@ int pwd_command()
     printf("%s\n", cwd);
     return 0;
 }
-void sls_command()
+int sls_command()
 {
     DIR *directory;
     char *fileName;
@@ -260,13 +242,10 @@ void sls_command()
             {
                 printf("(%ld bytes)\n", st.st_size); // in bytes
             }
-            else
-            {
-                perror("Error: cannot open directory")
-            }
         }
     }
     closedir(directory);
+    return 0;
 }
 
 void closeFDS(int fds[][2], int numCommands)
@@ -305,6 +284,15 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
         if (!strcmp(curr->args[0], "pwd"))
         {
             returnValues[currProcess] = pwd_command();
+            free(curr->args);
+            curr = curr->next;
+            returnValues[currProcess] = 0;
+            currProcess++;
+            continue;
+        }
+        if (!strcmp(curr->args[0], "sls"))
+        {
+            returnValues[currProcess] = sls_command();
             free(curr->args);
             curr = curr->next;
             returnValues[currProcess] = 0;

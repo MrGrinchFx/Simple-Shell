@@ -91,15 +91,17 @@ int getNumCommands(struct Command_Node *head)
 char **custom_parser(char *cmd)
 {
     char buffer[MAX_ARG_SIZE + 1];
-    char **args = malloc(MAX_NUM_ARGS * sizeof(char *));
+    char **args = malloc(sizeof(char *));
     int pointer = 0;  // index of cmd
     int count = 0;    // index of buffer
     int argCount = 0; // number of arguments
+
     while (cmd[pointer] != '\0')
     {
         if (count != 0 && cmd[pointer] == ' ')
         { // check if buffer is empty
             buffer[count] = '\0';
+            args = realloc(args, (argCount + 1) * sizeof(char *));
             args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for buffer
             strcpy(args[argCount], buffer);        // copy over buffer content
             argCount++;
@@ -111,11 +113,13 @@ char **custom_parser(char *cmd)
             if (count != 0)
             { // check if buffer is empty
                 buffer[count] = '\0';
+                args = realloc(args, (argCount + 1) * sizeof(char *));
                 args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for buffer
                 strcpy(args[argCount], buffer);        // copy over content
                 argCount++;
                 memset(buffer, '\0', sizeof(buffer)); // clear buffer
             }
+            args = realloc(args, (argCount + 1) * sizeof(char *));
             args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for |
             args[argCount] = "|";                  // add "|" to array
             argCount++;
@@ -126,11 +130,13 @@ char **custom_parser(char *cmd)
             if (count != 0)
             { // check if buffer is empty
                 buffer[count] = '\0';
+                args = realloc(args, (argCount + 1) * sizeof(char *));
                 args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for buffer
                 strcpy(args[argCount], buffer);        // copy over content
                 argCount++;
                 memset(buffer, '\0', sizeof(buffer)); // clear buffer
             }
+            args = realloc(args, (argCount + 1) * sizeof(char *));
             args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for >>
             args[argCount] = ">>";                 // add ">" to array
             argCount++;
@@ -142,11 +148,13 @@ char **custom_parser(char *cmd)
             if (count != 0)
             { // check if buffer is empty
                 buffer[count] = '\0';
+                args = realloc(args, (argCount + 1) * sizeof(char *));
                 args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for buffer
                 strcpy(args[argCount], buffer);        // copy over content
                 argCount++;
                 memset(buffer, '\0', sizeof(buffer)); // clear buffer
             }
+            args = realloc(args, (argCount + 1) * sizeof(char *));
             args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for >
             args[argCount] = ">";                  // add ">" to array
             argCount++;
@@ -160,7 +168,9 @@ char **custom_parser(char *cmd)
         pointer++;
     }
     /*WRITE CODE THAT WILL HANDLE ADDING THE LAST ARG AND NULL*/
-    if(count != 0) {
+    if (count != 0)
+    {
+        args = realloc(args, (argCount + 1) * sizeof(char *));
         args[argCount] = malloc(MAX_ARG_SIZE);
         buffer[count] = '\0';
         strcpy(args[argCount], buffer);
@@ -185,7 +195,8 @@ bool redirect(char **args)
         if (strcmp(args[i], ">") == 0 && i != count - 1)
         {
             int fileDesc = open(args[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777); // create file descriptor
-            if(fileDesc == -1) {
+            if (fileDesc == -1)
+            {
                 fprintf(stderr, "Error: cannot open output file");
                 return true;
             }
@@ -198,7 +209,8 @@ bool redirect(char **args)
         else if (strcmp(args[i], ">>") == 0 && i != count - 1)
         {
             int fileDesc = open(args[i + 1], O_WRONLY | O_APPEND | O_CREAT, 0777); // create file descriptor
-            if(fileDesc == -1) {
+            if (fileDesc == -1)
+            {
                 fprintf(stderr, "Error: cannot open output file");
                 return true;
             }
@@ -269,7 +281,8 @@ void closeFDS(int fds[][2], int numCommands)
     }
 }
 
-bool isBuiltIn(char* command) {
+bool isBuiltIn(char *command)
+{
     return (!strcmp(command, "cd") || !strcmp(command, "sls") || !strcmp(command, "pwd"));
 }
 
@@ -353,7 +366,8 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
     {
         int status;
         waitpid(head->pid, &status, 0);
-        if(!isBuiltIn(head->args[0]) && status) {
+        if (!isBuiltIn(head->args[0]) && status)
+        {
             returnValues[currWaiting] = 1;
             fprintf(stderr, "Error: command not found\n");
         }
@@ -375,31 +389,37 @@ void freeLinkedList(struct Command_Node *head)
     }
 }
 
-bool errorCheck(char** args) {
-    //check for too many args
+bool errorCheck(char **args)
+{
+    // check for too many args
     int numArgs = 0;
-    while(args[numArgs] != NULL) {
+    while (args[numArgs] != NULL)
+    {
         numArgs++;
     }
-    //printf("%d %s\n", numArgs, args[numArgs-1]);
-    if(numArgs > 16) {
+    // printf("%d %s\n", numArgs, args[numArgs-1]);
+    if (numArgs > 16)
+    {
         fprintf(stderr, "Error: too many process arguments\n");
         return true;
     }
-    //check for missing command: first or last arg is a pipe or first arg is a redirect
-    if(strcmp(args[0], "|") == 0 || strcmp(args[0], ">") == 0 
-    || strcmp(args[0], ">>") == 0 || strcmp(args[numArgs-1], "|\0") == 0) {
+    // check for missing command: first or last arg is a pipe or first arg is a redirect
+    if (strcmp(args[0], "|") == 0 || strcmp(args[0], ">") == 0 || strcmp(args[0], ">>") == 0 || strcmp(args[numArgs - 1], "|\0") == 0)
+    {
         fprintf(stderr, "Error: missing command\n");
         return true;
     }
-    //check for no output file: last arg is a redirect
-    if(strcmp(args[numArgs-1], ">") == 0 || strcmp(args[numArgs-1], ">>") == 0) {
+    // check for no output file: last arg is a redirect
+    if (strcmp(args[numArgs - 1], ">") == 0 || strcmp(args[numArgs - 1], ">>") == 0)
+    {
         fprintf(stderr, "Error: no output file\n");
         return true;
     }
-    //check for misplaced redirect
-    for(int i = 0; i < numArgs; i++) {
-        if(((!strcmp(args[i], ">") || !strcmp(args[i], ">>")) && i != numArgs-2)) {
+    // check for misplaced redirect
+    for (int i = 0; i < numArgs; i++)
+    {
+        if (((!strcmp(args[i], ">") || !strcmp(args[i], ">>")) && i != numArgs - 2))
+        {
             fprintf(stderr, "Error: mislocated output redirection\n");
             return true;
         }
@@ -441,14 +461,19 @@ int main(void)
             fprintf(stderr, "+ completed '%s' [0]\n", cmd);
             break;
         }
-
+        if (strcmp(cmd, "") == 0)
+        {
+            continue;
+        }
         char **args = custom_parser(cmd);
-        if(errorCheck(args)) {
+        if (errorCheck(args))
+        {
             free(args);
             continue;
         }
         int saved_out = dup(1);
-        if(redirect(args)) {
+        if (redirect(args))
+        {
             free(args);
             continue;
         }

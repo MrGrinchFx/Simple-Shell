@@ -5,3 +5,4 @@ sshell: sshell.c
 
 clean:
 	rm -f sshell
+	rm -f *.txt

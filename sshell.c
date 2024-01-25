@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <stdbool.h>
 
 #define CMDLINE_MAX 512
 #define CWD_MAX 1024
@@ -159,10 +160,13 @@ char **custom_parser(char *cmd)
         pointer++;
     }
     /*WRITE CODE THAT WILL HANDLE ADDING THE LAST ARG AND NULL*/
-    args[argCount] = malloc(MAX_ARG_SIZE);
-    buffer[count] = '\0';
-    strcpy(args[argCount], buffer);
-    argCount++;
+    if(count != 0) {
+        args[argCount] = malloc(MAX_ARG_SIZE);
+        buffer[count] = '\0';
+        strcpy(args[argCount], buffer);
+        argCount++;
+    }
+
     args = realloc(args, (argCount + 1) * sizeof(char *));
     args[argCount] = NULL;
     return args;
@@ -206,7 +210,8 @@ int cd_command(char **args)
     int status = chdir(args[1]);
     if (status != 0)
     {
-        perror("cd");
+        fprintf(stderr, "Error: cannot cd into directory\n");
+        return 1;
     }
     return 0;
 }
@@ -218,6 +223,7 @@ int pwd_command()
     if (status == NULL)
     {
         perror("pwd");
+        return 1;
     }
     printf("%s\n", cwd);
     return 0;
@@ -256,6 +262,10 @@ void closeFDS(int fds[][2], int numCommands)
     }
 }
 
+bool isBuiltIn(char* command) {
+    return (!strcmp(command, "cd") || !strcmp(command, "sls") || !strcmp(command, "pwd"));
+}
+
 void custom_system(struct Command_Node *head, int numCommands, int returnValues[])
 {
     // create array of pipes;
@@ -273,9 +283,7 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
         if (!strcmp(curr->args[0], "cd"))
         {
             returnValues[currProcess] = cd_command(curr->args);
-            free(curr->args);
             curr = curr->next;
-            returnValues[currProcess] = 0;
             currProcess++;
             continue;
         }
@@ -283,18 +291,14 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
         if (!strcmp(curr->args[0], "pwd"))
         {
             returnValues[currProcess] = pwd_command();
-            free(curr->args);
             curr = curr->next;
-            returnValues[currProcess] = 0;
             currProcess++;
             continue;
         }
         if (!strcmp(curr->args[0], "sls"))
         {
             returnValues[currProcess] = sls_command();
-            free(curr->args);
             curr = curr->next;
-            returnValues[currProcess] = 0;
             currProcess++;
             continue;
         }
@@ -330,7 +334,6 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
                 exit(1);
             }
         }
-        free(curr->args);
         curr = curr->next;
         returnValues[currProcess] = 0;
         currProcess++;
@@ -338,11 +341,56 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
     /*close all fds*/
     closeFDS(fds, numCommands);
     /*wait for all children to finish*/
+    int currWaiting = 0;
     while (head)
     {
-        waitpid(head->pid, NULL, 0);
+        int status;
+        waitpid(head->pid, &status, 0);
+        if(!isBuiltIn(head->args[0]) && status) {
+            returnValues[currWaiting] = 1;
+            fprintf(stderr, "Error: command not found\n");
+        }
         head = head->next;
+        currWaiting++;
     }
+}
+
+void freeLinkedList(struct Command_Node *head)
+{
+    struct Command_Node *current = head;
+    struct Command_Node *nextNode;
+    while (current != NULL)
+    {
+        nextNode = current->next;
+        free(current->args);
+        free(current);
+        current = nextNode;
+    }
+}
+
+bool errorCheck(char** args) {
+    //check for too many args
+    int numArgs = 0;
+    while(args[numArgs] != NULL) {
+        numArgs++;
+    }
+    //printf("%d %s\n", numArgs, args[numArgs-1]);
+    if(numArgs > 16) {
+        fprintf(stderr, "Error: too many process arguments\n");
+        return true;
+    }
+    //check for missing command: first or last arg is a pipe or first arg is a redirect
+    if(strcmp(args[0], "|") == 0 || strcmp(args[0], ">") == 0 
+    || strcmp(args[0], ">>") == 0 || strcmp(args[numArgs-1], "|\0") == 0) {
+        fprintf(stderr, "Error: missing command\n");
+        return true;
+    }
+    //check for no output file: last arg is a redirect
+    if(strcmp(args[numArgs-1], ">") == 0 || strcmp(args[numArgs-1], ">>") == 0) {
+        fprintf(stderr, "Error: no output file\n");
+        return true;
+    }
+    return false;
 }
 
 int main(void)
@@ -381,37 +429,31 @@ int main(void)
         }
 
         char **args = custom_parser(cmd);
+        if(errorCheck(args)) {
+            free(args);
+            continue;
+        }
         int saved_out = dup(1);
         redirect(args);
         struct Command_Node *head = createLinkedList(args);
         int numCommands = getNumCommands(head);
         int retvals[numCommands];
-        /*debug for printing contents of linked list*/
-        // while(head) {
-        //     for(int i = 0; head->args[i] != NULL; i++) {
-        //         printf("%s ", head->args[i]);
-        //     }
-        //     printf("\n");
-        //     head = head->next;
-        // }
-        /* Save output redirection */
 
         /* Execute command*/
         custom_system(head, numCommands, retvals);
-        /* Restore output redirection */
 
-        if (retvals[0] == 1)
-        { // Command not Found
-            printf("Error: command not found\n");
-        }
+        /*restore output redirection*/
         dup2(saved_out, 1);
         close(saved_out);
+
         fprintf(stderr, "+ completed '%s' ", cmd);
         for (int i = 0; i < numCommands; i++)
         {
             fprintf(stderr, "[%d]", retvals[i]);
         }
         fprintf(stderr, "\n");
+        free(args);
+        freeLinkedList(head);
     }
 
     return EXIT_SUCCESS;

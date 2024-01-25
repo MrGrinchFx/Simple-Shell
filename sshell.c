@@ -172,7 +172,7 @@ char **custom_parser(char *cmd)
     return args;
 }
 
-void redirect(char **args)
+bool redirect(char **args)
 {
     int count = 0; // Retrieve num of args
     while (args[count] != NULL)
@@ -185,7 +185,10 @@ void redirect(char **args)
         if (strcmp(args[i], ">") == 0 && i != count - 1)
         {
             int fileDesc = open(args[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777); // create file descriptor
-            /*Add Error Checking here*/
+            if(fileDesc == -1) {
+                fprintf(stderr, "Error: cannot open output file");
+                return true;
+            }
             dup2(fileDesc, STDOUT_FILENO); // duplicate to stdout
             close(fileDesc);               // remove original descriptor
             args[i] = NULL;                // set ">" as NULL
@@ -195,7 +198,10 @@ void redirect(char **args)
         else if (strcmp(args[i], ">>") == 0 && i != count - 1)
         {
             int fileDesc = open(args[i + 1], O_WRONLY | O_APPEND | O_CREAT, 0777); // create file descriptor
-            /*Add Error Checking here*/
+            if(fileDesc == -1) {
+                fprintf(stderr, "Error: cannot open output file");
+                return true;
+            }
             dup2(fileDesc, STDOUT_FILENO); // duplicate to stdout
             close(fileDesc);               // remove original descriptor
             args[i] = NULL;                // set ">" as NULL
@@ -203,6 +209,7 @@ void redirect(char **args)
             break;
         }
     }
+    return false;
 }
 
 int cd_command(char **args)
@@ -390,6 +397,13 @@ bool errorCheck(char** args) {
         fprintf(stderr, "Error: no output file\n");
         return true;
     }
+    //check for misplaced redirect
+    for(int i = 0; i < numArgs; i++) {
+        if(((!strcmp(args[i], ">") || !strcmp(args[i], ">>")) && i != numArgs-2)) {
+            fprintf(stderr, "Error: mislocated output redirection\n");
+            return true;
+        }
+    }
     return false;
 }
 
@@ -434,7 +448,10 @@ int main(void)
             continue;
         }
         int saved_out = dup(1);
-        redirect(args);
+        if(redirect(args)) {
+            free(args);
+            continue;
+        }
         struct Command_Node *head = createLinkedList(args);
         int numCommands = getNumCommands(head);
         int retvals[numCommands];

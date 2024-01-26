@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #define CMDLINE_MAX 512
 #define CWD_MAX 1024
@@ -330,6 +331,9 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
                 dup2(fds[currProcess][1], STDOUT_FILENO); /* Replace stdout with pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args);
+                if(errno == 2) {
+                    fprintf(stderr, "Error: command not found\n");
+                }
                 exit(1);
             }
         }
@@ -340,6 +344,9 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
                 dup2(fds[currProcess - 1][0], STDIN_FILENO); /* Replace stdin with pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args); /* Child #2 becomes command2 */
+                if(errno == 2) {
+                    fprintf(stderr, "Error: command not found\n");
+                }
                 exit(1);
             }
         }
@@ -351,6 +358,9 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
                 dup2(fds[currProcess][1], STDOUT_FILENO);    /* Replace stdout with next pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args); /* Child #2 becomes command2 */
+                if(errno == 2) {
+                    fprintf(stderr, "Error: command not found\n");
+                }
                 exit(1);
             }
         }
@@ -362,14 +372,14 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
     closeFDS(fds, numCommands);
     /*wait for all children to finish*/
     int currWaiting = 0;
+    int status = 0;
     while (head)
     {
-        int status;
+        status = 0;
         waitpid(head->pid, &status, 0);
-        if (!isBuiltIn(head->args[0]) && status)
-        {
-            returnValues[currWaiting] = 1;
-            fprintf(stderr, "Error: command not found\n");
+        if (status)
+        {   
+            returnValues[currWaiting] = WEXITSTATUS(status);
         }
         head = head->next;
         currWaiting++;

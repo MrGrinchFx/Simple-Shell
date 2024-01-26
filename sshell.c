@@ -15,16 +15,16 @@
 #define MAX_ARG_SIZE 32
 #define MAX_NUM_ARGS 16
 
-struct Command_Node
+struct commandNode
 {
     char **args;
-    struct Command_Node *next;
+    struct commandNode *next;
     pid_t pid;
-} Command_Node;
+} commandNode;
 
-void appendNode(struct Command_Node **head, char **args)
+void appendNode(struct commandNode **head, char **args)
 {
-    struct Command_Node *newNode = (struct Command_Node *)malloc(sizeof(Command_Node));
+    struct commandNode *newNode = (struct commandNode *)malloc(sizeof(commandNode));
     if (newNode == NULL)
     {
         return;
@@ -36,7 +36,7 @@ void appendNode(struct Command_Node **head, char **args)
         *head = newNode;
         return;
     }
-    struct Command_Node *current = *head;
+    struct commandNode *current = *head;
     while (current->next != NULL)
     {
         current = current->next;
@@ -44,9 +44,9 @@ void appendNode(struct Command_Node **head, char **args)
     current->next = newNode;
 }
 
-struct Command_Node *createLinkedList(char **args)
+struct commandNode *createLinkedList(char **args)
 {
-    struct Command_Node *head = NULL;
+    struct commandNode *head = NULL;
     int commandSize = 0;
     int i = 0;
     while (args[i - 1] != NULL)
@@ -76,10 +76,10 @@ struct Command_Node *createLinkedList(char **args)
     return head;
 }
 
-int getNumCommands(struct Command_Node *head)
+int getNumCommands(struct commandNode *head)
 {
     int num = 0;
-    struct Command_Node *curr = head;
+    struct commandNode *curr = head;
     while (curr)
     {
         num++;
@@ -88,98 +88,96 @@ int getNumCommands(struct Command_Node *head)
     return num;
 }
 
-/*TO DOOOOO: PLS MAKE SURE THAT WE CHECK IF BUFFER IS EMPTY WHEN WE ENCOUNTER THE KEY CHAR TO DETERMINE IF WE EXECUTE*/
-char **custom_parser(char *cmd)
+char **customParser(char *cmd)
 {
-    char buffer[MAX_ARG_SIZE + 1];
-    char **args = malloc(sizeof(char *));
-    int pointer = 0;  // index of cmd
-    int count = 0;    // index of buffer
-    int argCount = 0; // number of arguments
+    char buffer[MAX_ARG_SIZE + 1];        // allocate space for 16 chars and one null character
+    char **args = malloc(sizeof(char *)); // allocate an initial memory for a string.
+    int pointer = 0;                      // index of cmd
+    int count = 0;                        // index of buffer
+    int argCount = 0;                     // number of arguments
 
-    while (cmd[pointer] != '\0')
+    while (cmd[pointer] != '\0') // while its not the end of the command line
     {
-        if (count != 0 && cmd[pointer] == ' ')
-        { // check if buffer is empty
-            buffer[count] = '\0';
-            args = realloc(args, (argCount + 1) * sizeof(char *));
-            args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for buffer
-            strcpy(args[argCount], buffer);        // copy over buffer content
+        if (count != 0 && cmd[pointer] == ' ') // if buffer is not empty and not a white-space
+        {
+            buffer[count] = '\0';                                  // add a null char to buffer
+            args = realloc(args, (argCount + 1) * sizeof(char *)); // create an extra space in the args array
+            args[argCount] = malloc(MAX_ARG_SIZE);                 // allocate memory for a string in the array
+            strcpy(args[argCount], buffer);                        // copy over buffer content
             argCount++;
             memset(buffer, '\0', sizeof(buffer)); // clear the buffer
-            count = 0;
+            count = 0;                            // reset the size of the buffer
         }
-        else if (cmd[pointer] == '|')
+        else if (cmd[pointer] == '|') // if it s pipe argument
         {
-            if (count != 0)
-            { // check if buffer is empty
-                buffer[count] = '\0';
-                args = realloc(args, (argCount + 1) * sizeof(char *));
-                args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for buffer
-                strcpy(args[argCount], buffer);        // copy over content
+            if (count != 0) // check if buffer is empty
+            {
+                buffer[count] = '\0';                                  // add a null char to buffer
+                args = realloc(args, (argCount + 1) * sizeof(char *)); // create an extra space in the args array
+                args[argCount] = malloc(MAX_ARG_SIZE);                 // allocate memory for buffer
+                strcpy(args[argCount], buffer);                        // copy over content
                 argCount++;
                 memset(buffer, '\0', sizeof(buffer)); // clear buffer
             }
-            args = realloc(args, (argCount + 1) * sizeof(char *));
-            args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for |
-            args[argCount] = "|";                  // add "|" to array
+            args = realloc(args, (argCount + 1) * sizeof(char *)); // allocate memory for an extra index in the args array.
+            args[argCount] = malloc(MAX_ARG_SIZE);                 // allocate memory for "|" string
+            args[argCount] = "|";                                  // add "|" to array
             argCount++;
-            count = 0;
+            count = 0; // reset the buffer size
         }
-        else if (cmd[pointer] == '>' && cmd[pointer + 1] == '>')
+        else if (cmd[pointer] == '>' && cmd[pointer + 1] == '>') // check current char and next char for append operator.
         {
             if (count != 0)
-            { // check if buffer is empty
-                buffer[count] = '\0';
-                args = realloc(args, (argCount + 1) * sizeof(char *));
-                args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for buffer
-                strcpy(args[argCount], buffer);        // copy over content
+            {                                                          // check if buffer is empty
+                buffer[count] = '\0';                                  // append a null char to the end of buffer.
+                args = realloc(args, (argCount + 1) * sizeof(char *)); // allocate a new index in the buffer.
+                args[argCount] = malloc(MAX_ARG_SIZE);                 // allocate memory for buffer
+                strcpy(args[argCount], buffer);                        // copy over content
                 argCount++;
                 memset(buffer, '\0', sizeof(buffer)); // clear buffer
             }
-            args = realloc(args, (argCount + 1) * sizeof(char *));
-            args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for >>
-            args[argCount] = ">>";                 // add ">" to array
+            args = realloc(args, (argCount + 1) * sizeof(char *)); // allocate memory for a new index in args
+            args[argCount] = malloc(MAX_ARG_SIZE);                 // allocate memory for >>
+            args[argCount] = ">>";                                 // add ">" to array
             argCount++;
-            count = 0; // set buffer back to 0
+            count = 0; // set buffer size back to 0
             pointer++; // move onto next cmd char
         }
-        else if (cmd[pointer] == '>')
+        else if (cmd[pointer] == '>') // check if truncate operator
         {
             if (count != 0)
-            { // check if buffer is empty
-                buffer[count] = '\0';
-                args = realloc(args, (argCount + 1) * sizeof(char *));
-                args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for buffer
-                strcpy(args[argCount], buffer);        // copy over content
+            {                                                          // check if buffer is empty
+                buffer[count] = '\0';                                  // append a null char to buffer.
+                args = realloc(args, (argCount + 1) * sizeof(char *)); // allocate a new index in args.
+                args[argCount] = malloc(MAX_ARG_SIZE);                 // allocate memory for buffer
+                strcpy(args[argCount], buffer);                        // copy over content
                 argCount++;
                 memset(buffer, '\0', sizeof(buffer)); // clear buffer
             }
-            args = realloc(args, (argCount + 1) * sizeof(char *));
-            args[argCount] = malloc(MAX_ARG_SIZE); // allocate memory for >
-            args[argCount] = ">";                  // add ">" to array
+            args = realloc(args, (argCount + 1) * sizeof(char *)); // allocate new index in args
+            args[argCount] = malloc(MAX_ARG_SIZE);                 // allocate memory for >
+            args[argCount] = ">";                                  // add ">" to array
             argCount++;
-            count = 0;
+            count = 0; // reset buffer size
         }
-        else if (!isspace(cmd[pointer]))
+        else if (!isspace(cmd[pointer])) // if its not a space, then it's a letter or non-meta char symbol.
         {
-            buffer[count] = cmd[pointer];
+            buffer[count] = cmd[pointer]; // set the buffer char with the command line char.
             count++;
         }
         pointer++;
     }
-    /*WRITE CODE THAT WILL HANDLE ADDING THE LAST ARG AND NULL*/
-    if (count != 0)
+    if (count != 0) // if buffer is not empty
     {
-        args = realloc(args, (argCount + 1) * sizeof(char *));
-        args[argCount] = malloc(MAX_ARG_SIZE);
-        buffer[count] = '\0';
-        strcpy(args[argCount], buffer);
+        args = realloc(args, (argCount + 1) * sizeof(char *)); // allocate memory for new index for the last argument
+        args[argCount] = malloc(MAX_ARG_SIZE);                 // allocate memory in the index for a string.
+        buffer[count] = '\0';                                  // append null char to the buffer.
+        strcpy(args[argCount], buffer);                        // copy over the string.
         argCount++;
     }
 
-    args = realloc(args, (argCount + 1) * sizeof(char *));
-    args[argCount] = NULL;
+    args = realloc(args, (argCount + 1) * sizeof(char *)); // allocate new index in args for NULL argument
+    args[argCount] = NULL;                                 // set it to Null.
     return args;
 }
 
@@ -225,9 +223,9 @@ bool redirect(char **args)
     return false;
 }
 
-int cd_command(char **args)
+int cdCommand(char **args)
 {
-    int status = chdir(args[1]);
+    int status = chdir(args[1]); // returns 0 if successful.
     if (status != 0)
     {
         fprintf(stderr, "Error: cannot cd into directory\n");
@@ -236,10 +234,10 @@ int cd_command(char **args)
     return 0;
 }
 
-int pwd_command()
+int pwdCommand()
 {
     char cwd[CWD_MAX];
-    char *status = getcwd(cwd, sizeof(cwd));
+    char *status = getcwd(cwd, sizeof(cwd)); // returns a status with type char*.
     if (status == NULL)
     {
         perror("pwd");
@@ -248,12 +246,12 @@ int pwd_command()
     printf("%s\n", cwd);
     return 0;
 }
-int sls_command()
+int slsCommand()
 {
     DIR *directory;
     struct dirent *directoryContent;
     directory = opendir("."); // open current directory
-    struct stat st;
+    struct stat statistics;
 
     while ((directoryContent = readdir(directory)) != NULL)
     {
@@ -263,13 +261,13 @@ int sls_command()
         else
         {
             printf("%s ", directoryContent->d_name);
-            if (stat(directoryContent->d_name, &st) == 0)
+            if (stat(directoryContent->d_name, &statistics) == 0) // stat returns 0 if successfully retrieved statistics.
             {
-                printf("(%ld bytes)\n", st.st_size); // in bytes
+                printf("(%ld bytes)\n", statistics.st_size); // in bytes
             }
         }
     }
-    closedir(directory);
+    closedir(directory); // close the directory after finishing looking at it.
     return 0;
 }
 
@@ -287,7 +285,7 @@ bool isBuiltIn(char *command)
     return (!strcmp(command, "cd") || !strcmp(command, "sls") || !strcmp(command, "pwd"));
 }
 
-void custom_system(struct Command_Node *head, int numCommands, int returnValues[])
+void customSystem(struct commandNode *head, int numCommands, int returnValues[])
 {
     // create array of pipes;
     int fds[numCommands - 1][2];
@@ -296,14 +294,14 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
         pipe(fds[i]);
     }
 
-    struct Command_Node *curr = head;
+    struct commandNode *curr = head;
     int currProcess = 0;
     while (curr)
     {
         /*CD COMMAND*/
         if (!strcmp(curr->args[0], "cd"))
         {
-            returnValues[currProcess] = cd_command(curr->args);
+            returnValues[currProcess] = cdCommand(curr->args);
             curr = curr->next;
             currProcess++;
             continue;
@@ -311,14 +309,14 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
         /*PWD COMMAND*/
         if (!strcmp(curr->args[0], "pwd"))
         {
-            returnValues[currProcess] = pwd_command();
+            returnValues[currProcess] = pwdCommand();
             curr = curr->next;
             currProcess++;
             continue;
         }
         if (!strcmp(curr->args[0], "sls"))
         {
-            returnValues[currProcess] = sls_command();
+            returnValues[currProcess] = slsCommand();
             curr = curr->next;
             currProcess++;
             continue;
@@ -331,7 +329,8 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
                 dup2(fds[currProcess][1], STDOUT_FILENO); /* Replace stdout with pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args);
-                if(errno == 2) {
+                if (errno == 2)
+                {
                     fprintf(stderr, "Error: command not found\n");
                 }
                 exit(1);
@@ -344,7 +343,8 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
                 dup2(fds[currProcess - 1][0], STDIN_FILENO); /* Replace stdin with pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args); /* Child #2 becomes command2 */
-                if(errno == 2) {
+                if (errno == 2)
+                {
                     fprintf(stderr, "Error: command not found\n");
                 }
                 exit(1);
@@ -358,7 +358,8 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
                 dup2(fds[currProcess][1], STDOUT_FILENO);    /* Replace stdout with next pipe */
                 closeFDS(fds, numCommands);
                 execvp(curr->args[0], curr->args); /* Child #2 becomes command2 */
-                if(errno == 2) {
+                if (errno == 2)
+                {
                     fprintf(stderr, "Error: command not found\n");
                 }
                 exit(1);
@@ -378,7 +379,7 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
         status = 0;
         waitpid(head->pid, &status, 0);
         if (status)
-        {   
+        {
             returnValues[currWaiting] = WEXITSTATUS(status);
         }
         head = head->next;
@@ -386,10 +387,10 @@ void custom_system(struct Command_Node *head, int numCommands, int returnValues[
     }
 }
 
-void freeLinkedList(struct Command_Node *head)
+void freeLinkedList(struct commandNode *head)
 {
-    struct Command_Node *current = head;
-    struct Command_Node *nextNode;
+    struct commandNode *current = head;
+    struct commandNode *nextNode;
     while (current != NULL)
     {
         nextNode = current->next;
@@ -471,42 +472,42 @@ int main(void)
             fprintf(stderr, "+ completed '%s' [0]\n", cmd);
             break;
         }
-        if (strcmp(cmd, "") == 0)
+        if (strcmp(cmd, "") == 0) // check if the command line is empty before parsing
         {
             continue;
         }
-        char **args = custom_parser(cmd);
-        if (errorCheck(args))
+        char **args = customParser(cmd); // parse the command line
+        if (errorCheck(args))            // check for errors in arguments
         {
             free(args);
             continue;
         }
-        int saved_out = dup(1);
+        int saved_out = dup(1); // save the stdout for later restoration.
         if (redirect(args))
         {
             free(args);
             continue;
         }
-        struct Command_Node *head = createLinkedList(args);
+        struct commandNode *head = createLinkedList(args);
         int numCommands = getNumCommands(head);
         int retvals[numCommands];
 
         /* Execute command*/
-        custom_system(head, numCommands, retvals);
+        customSystem(head, numCommands, retvals);
 
         /*restore output redirection*/
         dup2(saved_out, 1);
         close(saved_out);
 
         fprintf(stderr, "+ completed '%s' ", cmd);
-        for (int i = 0; i < numCommands; i++)
+        for (int i = 0; i < numCommands; i++) // print error code of all commands
         {
             fprintf(stderr, "[%d]", retvals[i]);
         }
         fprintf(stderr, "\n");
+        /*Free all allocated memory*/
         free(args);
         freeLinkedList(head);
     }
-
     return EXIT_SUCCESS;
 }

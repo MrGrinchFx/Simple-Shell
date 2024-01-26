@@ -6,7 +6,7 @@ The idea of the program is to mimic an actual shell such as git bash that
 utilizes the execvp() function in order to make syscalls to the operating
 system as well as supporting common shell commands that are built-in.
 Depending on the users-commands, the program will execute operations such as
-redirection and piping (The main components).
+redirection and piping.
 
 ## Implementation
 
@@ -23,26 +23,35 @@ The custom_parser() function is the first function that the command line is
 passed into in order to return an array of strings (return type: char\*\*). In
 order to determine when the end of the argument has been reached, it is not
 enough to just separate by whitespaces, so each character of the command line
-must be visited. The function will parse through the command until it either
-reaches a space, >, >>, or | character. (>> is handled by looking at current
-character and the character right after.) If any of the meta characters that are
-to be included in the array of arguments such as the redirection operator must
-have its previous command and arguments. This is done by using a buffer array
-that we'll use to record what non-space characters we have encountered thus far,
-and whenever we reach any of the "termination" characters, we will take whatever
-is in the buffer array and copy it over to the arguments array that we passed
-into the function. We also have to include the "termination" character as well,
-so we have to also append it to the array of arguments. Once we reach the null
-character of the command line, we will break out of the while loop and have to
-append any argument in the buffer array, if there is any, and append a NULL to
-the array as required by execvp().
+must be visited. The function will parse through the command character by
+character until it either reaches a space, >, >>, or | character as these are
+considered the bridge between string arguments. (>> is handled by looking at
+the current character and the character right after.) If any of the
+meta characters that are to be included in the array of arguments, such as the
+redirection operator or the pipe operator, must have its previous commands and
+arguments. This is done by using a buffer array that we'll use to record what
+non-space characters we have encountered thus far, and whenever we reach any of
+the "termination" characters, we will take whatever is recorded in the buffer
+array and copy it over to the arguments array that we passed into the function.
+We also have to include the "termination" character as well, so we have to also
+append it to the array of arguments. Once we reach the null character of the
+command line, we know we have reached the end and we will break out of the while
+loop and have to append any argument in the buffer array, if there is any, and
+append a NULL to the array as required by execvp().
 
 ## Redirection
 
 Redirection is implemented by checking the last two arguments after the command
 line has been parsed. If the second to last argument is a redirect character,
 the function assumes that the next argument is the file name, so it opens the
-output file and duplicates its file descriptor into stdout.
+output file and duplicates its file descriptor into stdout. In order to
+differentiate between the behaviour of the ">" and ">>" arguments, we open a file
+descriptors with the corresponding permissions, such as O_WRONLY and 0_CREAT for
+creating a new file if the file doesn't already exist. As for truncate, it must
+be ensure that the file descriptor specifies that a file will be created if it
+doesn't already exist, BUT must append to the exisiting file if the file exists
+within the directory. Redirection will return a boolean status if it has
+succeeded or failed.
 
 ## cd
 
@@ -93,7 +102,7 @@ values, setting them in the final status array.
 All parsing errors were done after the custom parser is run, but before the
 commands are placed into the linked list data structure. If the error checker
 detects an error, all memory is freed and the shell continues to ask for the
-next prompt. 
+next prompt.
 
 For launching errors, they were checked during the command execution steps. In
 the event that a file could not be opened, the cd command will set the status

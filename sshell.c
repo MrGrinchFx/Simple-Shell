@@ -408,7 +408,6 @@ bool errorCheck(char **args)
     {
         numArgs++;
     }
-    // printf("%d %s\n", numArgs, args[numArgs-1]);
     if (numArgs > 16)
     {
         fprintf(stderr, "Error: too many process arguments\n");
